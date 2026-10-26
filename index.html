@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Rabbit – กระต่ายน้อยส่งแครอท (ม.2)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Thai Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Kanit', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 35%, #fbcfe8 100%);
+            min-height: 100vh;
+        }
+
+        .btn-press {
+            transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-press:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-press:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Smooth tile grid styling */
+        .grid-cell {
+            aspect-ratio: 1 / 1;
+            transition: background-color 0.2s ease;
+        }
+
+        /* Sprite Rotation */
+        .rabbit-sprite {
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* Command Card Animations */
+        .command-card {
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+        }
+
+        .command-card:hover {
+            transform: translateY(-2px) scale(1.03);
+        }
+
+        .executing-cmd {
+            ring: 4px solid #f59e0b;
+            transform: scale(1.1);
+            background-color: #fef3c7 !important;
+        }
+
+        /* Bounce Keyframe */
+        @keyframes hop {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .animate-hop {
+            animation: hop 0.5s ease-in-out;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6)); }
+            50% { filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.9)); }
+        }
+
+        .carrot-glow {
+            animation: pulse-glow 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="flex flex-col justify-between items-center min-h-screen p-2 sm:p-4 text-slate-800">
+
+    <!-- Header Section -->
+    <header class="w-full max-w-4xl flex flex-col sm:flex-row justify-between items-center bg-white/90 backdrop-blur-md p-3 sm:p-4 rounded-3xl shadow-xl border-4 border-amber-300 gap-2 mb-3">
+        <div class="flex items-center gap-3">
+            <span class="text-4xl sm:text-5xl animate-bounce">🐰</span>
+            <div>
+                <h1 class="text-xl sm:text-2xl font-extrabold text-amber-600 tracking-wide flex items-center gap-2">
+                    Code Rabbit <span class="text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full font-normal">ม.2</span>
+                </h1>
+                <p class="text-xs text-slate-500 font-semibold">อัลกอริทึมและเขียนโปรแกรมแบบบล็อก</p>
+            </div>
+        </div>
+
+        <!-- Dashboard Stats -->
+        <div class="flex items-center gap-3 sm:gap-4 bg-amber-50 px-4 py-2 rounded-2xl border-2 border-amber-200">
+            <div class="text-center">
+                <span class="text-xs text-slate-500 font-bold block">ด่าน</span>
+                <span id="levelDisplay" class="text-lg font-extrabold text-amber-700">1/5</span>
+            </div>
+            <div class="h-8 w-0.5 bg-amber-200"></div>
+            <div class="text-center">
+                <span class="text-xs text-slate-500 font-bold block">ชีวิต</span>
+                <span id="livesDisplay" class="text-lg font-extrabold text-rose-500">❤️❤️❤️</span>
+            </div>
+            <div class="h-8 w-0.5 bg-amber-200"></div>
+            <div class="text-center">
+                <span class="text-xs text-slate-500 font-bold block">เวลา</span>
+                <span id="timerDisplay" class="text-lg font-extrabold text-indigo-600">00:00</span>
+            </div>
+            <div class="h-8 w-0.5 bg-amber-200"></div>
+            <div class="text-center">
+                <span class="text-xs text-slate-500 font-bold block">คะแนน</span>
+                <span id="scoreDisplay" class="text-lg font-extrabold text-emerald-600">0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Workspace -->
+    <main class="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-4 my-auto">
+        
+        <!-- Left Column: Map Board (7 cols) -->
+        <section class="lg:col-span-7 bg-white rounded-3xl p-4 sm:p-5 shadow-2xl border-4 border-amber-300 flex flex-col items-center justify-between min-h-[380px]">
+            <!-- Level Goal Hint -->
+            <div class="w-full bg-amber-100/80 border-2 border-amber-300 rounded-2xl p-2.5 mb-3 text-center">
+                <p id="levelHint" class="text-sm font-semibold text-amber-900">
+                    🎯 คำสั่ง: เดินไปเก็บแครอทสดอร่อยแล้วไปถึงจุดหมายนะ!
+                </p>
+            </div>
+
+            <!-- Grid Container -->
+            <div class="relative w-full max-w-[340px] sm:max-w-[380px] bg-emerald-100 p-2 sm:p-3 rounded-2xl border-4 border-emerald-400 shadow-inner">
+                <div id="gridBoard" class="grid gap-1.5 sm:gap-2 w-full">
+                    <!-- Dynamic Tiles injected here -->
+                </div>
+            </div>
+
+            <!-- Dynamic Feedback Status Bar -->
+            <div id="statusBox" class="w-full text-center mt-3 p-2 rounded-2xl font-bold text-sm bg-slate-100 text-slate-600 min-h-[40px] flex items-center justify-center">
+                พร้อมป้อนคำสั่งแล้ว! เลือกบล็อกคำสั่งแล้วกด "เริ่มทำงาน (RUN)"
+            </div>
+        </section>
+
+        <!-- Right Column: Command Builder & Controls (5 cols) -->
+        <section class="lg:col-span-5 flex flex-col gap-3">
+            
+            <!-- Command Palette / Cards Selection -->
+            <div class="bg-white rounded-3xl p-4 shadow-xl border-4 border-amber-300">
+                <h3 class="text-sm font-bold text-slate-700 mb-2.5 flex items-center gap-1.5">
+                    <span>🧩</span> เลือกการ์ดคำสั่ง (คลิก/แตะเพื่อเพิ่ม)
+                </h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="addCommand('FORWARD')" class="command-card bg-sky-500 hover:bg-sky-600 text-white font-bold p-2.5 rounded-2xl flex items-center justify-start gap-2 shadow-md border-b-4 border-sky-700">
+                        <span class="text-2xl">⬆️</span>
+                        <div class="text-left leading-tight">
+                            <span class="block text-xs text-sky-100">MOVE</span>
+                            <span class="text-sm">เดินหน้า</span>
+                        </div>
+                    </button>
+
+                    <button onclick="addCommand('TURN_LEFT')" class="command-card bg-purple-500 hover:bg-purple-600 text-white font-bold p-2.5 rounded-2xl flex items-center justify-start gap-2 shadow-md border-b-4 border-purple-700">
+                        <span class="text-2xl">⬅️</span>
+                        <div class="text-left leading-tight">
+                            <span class="block text-xs text-purple-100">ROTATE</span>
+                            <span class="text-sm">เลี้ยวซ้าย</span>
+                        </div>
+                    </button>
+
+                    <button onclick="addCommand('TURN_RIGHT')" class="command-card bg-indigo-500 hover:bg-indigo-600 text-white font-bold p-2.5 rounded-2xl flex items-center justify-start gap-2 shadow-md border-b-4 border-indigo-700">
+                        <span class="text-2xl">➡️</span>
+                        <div class="text-left leading-tight">
+                            <span class="block text-xs text-indigo-100">ROTATE</span>
+                            <span class="text-sm">เลี้ยวขวา</span>
+                        </div>
+                    </button>
+
+                    <button onclick="addCommand('COLLECT')" class="command-card bg-emerald-500 hover:bg-emerald-600 text-white font-bold p-2.5 rounded-2xl flex items-center justify-start gap-2 shadow-md border-b-4 border-emerald-700">
+                        <span class="text-2xl">🥕</span>
+                        <div class="text-left leading-tight">
+                            <span class="block text-xs text-emerald-100">ACTION</span>
+                            <span class="text-sm">เก็บแครอท</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Command Sequence Queue (Program Logic Stack) -->
+            <div class="bg-white rounded-3xl p-4 shadow-xl border-4 border-amber-300 flex-1 flex flex-col min-h-[220px]">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                        <span>📜</span> ลำดับคำสั่งที่ต่อกัน (<span id="cmdCount">0</span>)
+                    </h3>
+                    <button onclick="clearCommands()" class="text-xs bg-rose-100 hover:bg-rose-200 text-rose-600 font-bold px-2.5 py-1 rounded-xl transition">
+                        ล้างทั้งหมด
+                    </button>
+                </div>
+
+                <!-- Command Cards Drop Queue -->
+                <div id="commandQueue" class="flex-1 bg-amber-50/60 rounded-2xl p-2.5 border-2 border-dashed border-amber-300 flex flex-wrap gap-2 content-start overflow-y-auto max-h-[160px] sm:max-h-[200px]">
+                    <div id="emptyQueueText" class="w-full h-full flex flex-col items-center justify-center text-slate-400 my-auto py-6">
+                        <span class="text-3xl mb-1">👈</span>
+                        <span class="text-xs font-semibold">แตะเลือกบล็อกคำสั่งด้านบนเพื่อต่อลำดับ</span>
+                    </div>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex gap-2 mt-3">
+                    <button id="runBtn" onclick="runProgram()" class="btn-press flex-1 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white text-base sm:text-lg font-bold py-3 px-4 rounded-2xl flex items-center justify-center gap-2 border-2 border-emerald-400">
+                        <span>▶️</span> เริ่มทำงาน (RUN)
+                    </button>
+                    <button id="resetBtn" onclick="resetLevelState()" class="btn-press bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-4 rounded-2xl border-2 border-slate-300">
+                        🔄 รีเซ็ต
+                    </button>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Custom Explanation Modal / Try Again -->
+    <div id="feedbackModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-3xl p-6 max-w-md w-full text-center shadow-2xl border-4 border-amber-400 transform transition-all scale-100">
+            <div id="modalIcon" class="text-6xl mb-2">🐞</div>
+            <h3 id="modalTitle" class="text-2xl font-bold mb-2 text-slate-800">ลองใหม่อีกครั้ง!</h3>
+            <p id="modalMessage" class="text-slate-600 text-base mb-6 leading-relaxed">
+                กระต่ายเดินชนสิ่งกีดขวาง หรือยังไม่ได้เก็บแครอทครบ ตรวจสอบอัลกอริทึมใหม่อีกครั้งนะ!
+            </p>
+            <button onclick="closeModal()" class="btn-press w-full bg-amber-500 hover:bg-amber-600 text-white text-lg font-bold py-3 rounded-2xl border-2 border-amber-400 shadow-md">
+                แก้ไขคำสั่ง ✏️
+            </button>
+        </div>
+    </div>
+
+    <!-- Final Score Summary Screen -->
+    <main id="summaryScreen" class="fixed inset-0 bg-amber-100/95 backdrop-blur-md flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full text-center shadow-2xl border-4 border-amber-400">
+            <div class="text-6xl mb-2 animate-bounce">🏆</div>
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-amber-600 mb-1">ภารกิจสำเร็จ!</h1>
+            <p class="text-slate-500 font-bold text-sm mb-4">สรุปผลการแก้ปัญหาด้วยอัลกอริทึม Code Rabbit</p>
+
+            <div id="finalStars" class="text-5xl mb-4 tracking-widest">⭐⭐⭐</div>
+
+            <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 mb-6 text-left space-y-2">
+                <div class="flex justify-between items-center text-slate-700 font-semibold">
+                    <span>คะแนนรวมทั้งหมด:</span>
+                    <span id="finalScore" class="text-2xl font-extrabold text-emerald-600">0</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-700 font-semibold">
+                    <span>เวลาที่ใช้ทั้งหมด:</span>
+                    <span id="finalTime" class="text-lg font-bold text-indigo-600">00:00</span>
+                </div>
+                <div class="flex justify-between items-center text-slate-700 font-semibold">
+                    <span>หัวใจที่เหลือ:</span>
+                    <span id="finalLives" class="text-lg font-bold text-rose-500">❤️❤️❤️</span>
+                </div>
+            </div>
+
+            <button onclick="restartGame()" class="btn-press w-full bg-emerald-500 hover:bg-emerald-600 text-white text-xl font-bold py-4 rounded-2xl border-2 border-emerald-400">
+                🔄 เล่นใหม่อีกครั้ง
+            </button>
+        </div>
+    </main>
+
+    <footer class="text-center text-xs text-slate-600 font-medium py-2">
+        สื่อการเรียนรู้วิทยาการคำนวณ ม.2 • พัฒนาด้วย HTML, JS & Tailwind CSS
+    </footer>
+
+    <!-- Game Engine Scripts -->
+    <script>
+        // Web Audio Synthesizer For Sound Effects
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+
+                if (type === 'add') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.setValueAtTime(880, now + 0.05);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } else if (type === 'move') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                    osc.start(now);
+                    osc.stop(now + 0.15);
+                } else if (type === 'turn') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(500, now);
+                    osc.frequency.setValueAtTime(400, now + 0.08);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } else if (type === 'collect') {
+                    const notes = [523.25, 659.25, 783.99, 1046.50];
+                    notes.forEach((freq, i) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(freq, now + (i * 0.06));
+                        g.gain.setValueAtTime(0.15, now + (i * 0.06));
+                        g.gain.exponentialRampToValueAtTime(0.001, now + (i * 0.06) + 0.15);
+                        o.start(now + (i * 0.06));
+                        o.stop(now + (i * 0.06) + 0.15);
+                    });
+                } else if (type === 'wrong') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.setValueAtTime(150, now + 0.15);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'win') {
+                    const winNotes = [440, 554.37, 659.25, 880];
+                    winNotes.forEach((freq, i) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.connect(g);
+                        g.connect(audioCtx.destination);
+                        o.type = 'triangle';
+                        o.frequency.setValueAtTime(freq, now + (i * 0.1));
+                        g.gain.setValueAtTime(0.2, now + (i * 0.1));
+                        g.gain.exponentialRampToValueAtTime(0.001, now + (i * 0.1) + 0.3);
+                        o.start(now + (i * 0.1));
+                        o.stop(now + (i * 0.1) + 0.3);
+                    });
+                }
+            } catch (e) {
+                // Audio autoplay fallback
+            }
+        }
+
+        // Direction Vector Map: 0 = North (Up), 1 = East (Right), 2 = South (Down), 3 = West (Left)
+        const DIR_VECTORS = [
+            { x: 0, y: -1, name: 'เหนือ' },
+            { x: 1, y: 0, name: 'ตะวันออก' },
+            { x: 0, y: 1, name: 'ใต้' },
+            { x: -1, y: 0, name: 'ตะวันตก' }
+        ];
+
+        // 5 Levels Configuration
+        const LEVELS = [
+            {
+                gridSize: 4,
+                start: { x: 0, y: 3, dir: 1 }, // Start facing East
+                goal: { x: 3, y: 3 },
+                carrots: [{ x: 2, y: 3, collected: false }],
+                obstacles: [{ x: 1, y: 2 }, { x: 2, y: 2 }],
+                hint: "ด่าน 1: เดินหน้า ➡️ เก็บแครอท 🥕 แล้วเดินไปยังตะกร้าเป้าหมาย!"
+            },
+            {
+                gridSize: 4,
+                start: { x: 0, y: 3, dir: 0 }, // Start facing North
+                goal: { x: 3, y: 0 },
+                carrots: [{ x: 0, y: 0, collected: false }],
+                obstacles: [{ x: 1, y: 1 }, { x: 2, y: 2 }],
+                hint: "ด่าน 2: เลี้ยวและเดินขึ้นไปเก็บแครอท แล้วเลี้ยวขวาตรงไปที่เป้าหมาย!"
+            },
+            {
+                gridSize: 5,
+                start: { x: 0, y: 4, dir: 1 },
+                goal: { x: 4, y: 0 },
+                carrots: [
+                    { x: 2, y: 4, collected: false },
+                    { x: 2, y: 1, collected: false }
+                ],
+                obstacles: [{ x: 1, y: 3 }, { x: 3, y: 1 }, { x: 3, y: 3 }],
+                hint: "ด่าน 3: มีแครอท 2 หัว! วางแผนเก็บให้ครบทั้งสองหัวก่อนเข้าเป้าหมาย"
+            },
+            {
+                gridSize: 5,
+                start: { x: 0, y: 2, dir: 1 },
+                goal: { x: 4, y: 2 },
+                carrots: [
+                    { x: 2, y: 0, collected: false },
+                    { x: 2, y: 4, collected: false }
+                ],
+                obstacles: [{ x: 2, y: 2 }, { x: 1, y: 1 }, { x: 3, y: 3 }],
+                hint: "ด่าน 4: โขดหินขวางทางตรงกลาง! ต้องอ้อมไปเก็บแครอทบนและล่าง"
+            },
+            {
+                gridSize: 5,
+                start: { x: 0, y: 0, dir: 1 },
+                goal: { x: 4, y: 4 },
+                carrots: [
+                    { x: 4, y: 0, collected: false },
+                    { x: 0, y: 4, collected: false }
+                ],
+                obstacles: [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 }, { x: 1, y: 3 }],
+                hint: "ด่าน 5 (ระดับเซียน): เขาวงกตแครอท! วางลำดับอัลกอริทึมให้แม่นยำที่สุด!"
+            }
+        ];
+
+        // Global State Variables
+        let currentLevelIdx = 0;
+        let lives = 3;
+        let score = 0;
+        let timerSeconds = 0;
+        let timerInterval = null;
+        let commands = [];
+        let isRunning = false;
+
+        // Current Interactive Robot State
+        let rabbitState = { x: 0, y: 0, dir: 1 };
+        let currentCarrots = [];
+
+        // Initialize App on Load
+        window.onload = () => {
+            initLevel();
+            startTimer();
+        };
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timerSeconds++;
+                const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+                const secs = String(timerSeconds % 60).padStart(2, '0');
+                document.getElementById('timerDisplay').innerText = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function initLevel() {
+            const level = LEVELS[currentLevelIdx];
+            rabbitState = { ...level.start };
+            currentCarrots = level.carrots.map(c => ({ ...c }));
+            commands = [];
+            
+            document.getElementById('levelDisplay').innerText = `${currentLevelIdx + 1}/${LEVELS.length}`;
+            document.getElementById('levelHint').innerText = level.hint;
+            document.getElementById('runBtn').disabled = false;
+            
+            updateLivesUI();
+            updateCommandQueueUI();
+            renderBoard();
+            updateStatusText("พร้อมป้อนคำสั่งแล้ว! เพิ่มการ์ดคำสั่งด้านขวามือได้เลย", "text-slate-600");
+        }
+
+        function updateLivesUI() {
+            let heartStr = "";
+            for (let i = 0; i < lives; i++) heartStr += "❤️";
+            for (let i = lives; i < 3; i++) heartStr += "🖤";
+            document.getElementById('livesDisplay').innerText = heartStr || "💀";
+        }
+
+        function renderBoard() {
+            const level = LEVELS[currentLevelIdx];
+            const gridEl = document.getElementById('gridBoard');
+            gridEl.style.gridTemplateColumns = `repeat(${level.gridSize}, minmax(0, 1fr))`;
+            gridEl.innerHTML = '';
+
+            for (let r = 0; r < level.gridSize; r++) {
+                for (let c = 0; c < level.gridSize; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = "grid-cell bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-center relative text-xl sm:text-2xl shadow-sm overflow-hidden";
+
+                    // Check Goal
+                    if (c === level.goal.x && r === level.goal.y) {
+                        cell.innerHTML = `<span class="text-2xl sm:text-3xl">🧺</span>`;
+                        cell.classList.add('bg-amber-100', 'border-amber-300');
+                    }
+
+                    // Check Obstacles
+                    const isObstacle = level.obstacles.some(o => o.x === c && o.y === r);
+                    if (isObstacle) {
+                        cell.innerHTML = `<span class="text-xl sm:text-2xl">🪨</span>`;
+                        cell.classList.add('bg-slate-200', 'border-slate-300');
+                    }
+
+                    // Check Carrots
+                    const carrot = currentCarrots.find(crt => crt.x === c && crt.y === r && !crt.collected);
+                    if (carrot) {
+                        cell.innerHTML = `<span class="text-2xl sm:text-3xl carrot-glow">🥕</span>`;
+                    }
+
+                    // Check Rabbit Character
+                    if (c === rabbitState.x && r === rabbitState.y) {
+                        // Rotation Degrees based on dir (0: North=-90deg, 1: East=0deg, 2: South=90deg, 3: West=180deg)
+                        const rotDegrees = (rabbitState.dir - 1) * 90;
+                        const rabbitEl = document.createElement('div');
+                        rabbitEl.className = "rabbit-sprite text-3xl sm:text-4xl absolute z-10 filter drop-shadow-md";
+                        rabbitEl.style.transform = `rotate(${rotDegrees}deg)`;
+                        rabbitEl.innerText = "🐰";
+                        cell.appendChild(rabbitEl);
+                        cell.classList.add('bg-amber-50');
+                    }
+
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        function addCommand(type) {
+            if (isRunning) return;
+            if (commands.length >= 20) {
+                updateStatusText("⚠️ คำสั่งเต็มแล้ว! (สูงสุด 20 คำสั่ง)", "text-amber-600");
+                return;
+            }
+            playSound('add');
+            commands.push(type);
+            updateCommandQueueUI();
+        }
+
+        function removeCommand(index) {
+            if (isRunning) return;
+            playSound('turn');
+            commands.splice(index, 1);
+            updateCommandQueueUI();
+        }
+
+        function clearCommands() {
+            if (isRunning) return;
+            playSound('turn');
+            commands = [];
+            updateCommandQueueUI();
+        }
+
+        function updateCommandQueueUI() {
+            const queueEl = document.getElementById('commandQueue');
+            const emptyText = document.getElementById('emptyQueueText');
+            document.getElementById('cmdCount').innerText = commands.length;
+
+            queueEl.innerHTML = '';
+
+            if (commands.length === 0) {
+                queueEl.appendChild(emptyText);
+                return;
+            }
+
+            commands.forEach((cmd, idx) => {
+                const btn = document.createElement('button');
+                btn.id = `cmd-item-${idx}`;
+                btn.onclick = () => removeCommand(idx);
+
+                let badgeColor = "";
+                let icon = "";
+                let title = "";
+
+                if (cmd === 'FORWARD') {
+                    badgeColor = "bg-sky-500 text-white border-sky-600";
+                    icon = "⬆️";
+                    title = "เดินหน้า";
+                } else if (cmd === 'TURN_LEFT') {
+                    badgeColor = "bg-purple-500 text-white border-purple-600";
+                    icon = "⬅️";
+                    title = "ซ้าย";
+                } else if (cmd === 'TURN_RIGHT') {
+                    badgeColor = "bg-indigo-500 text-white border-indigo-600";
+                    icon = "➡️";
+                    title = "ขวา";
+                } else if (cmd === 'COLLECT') {
+                    badgeColor = "bg-emerald-500 text-white border-emerald-600";
+                    icon = "🥕";
+                    title = "เก็บ";
+                }
+
+                btn.className = `command-card ${badgeColor} border px-2.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-sm relative group`;
+                btn.innerHTML = `
+                    <span>${icon}</span>
+                    <span>${title}</span>
+                    <span class="text-[10px] opacity-60 group-hover:opacity-100 font-normal">✕</span>
+                `;
+                queueEl.appendChild(btn);
+            });
+        }
+
+        function updateStatusText(msg, colorClass = "text-slate-700") {
+            const statusBox = document.getElementById('statusBox');
+            statusBox.className = `w-full text-center mt-3 p-2 rounded-2xl font-bold text-sm bg-slate-100 ${colorClass} min-h-[40px] flex items-center justify-center transition-all`;
+            statusBox.innerText = msg;
+        }
+
+        const delay = ms => new Promise(res => setTimeout(res, ms));
+
+        async function runProgram() {
+            if (isRunning || commands.length === 0) return;
+
+            isRunning = true;
+            document.getElementById('runBtn').disabled = true;
+            const level = LEVELS[currentLevelIdx];
+
+            // Reset Board State for fresh run
+            rabbitState = { ...level.start };
+            currentCarrots = level.carrots.map(c => ({ ...c }));
+            renderBoard();
+
+            updateStatusText("🚀 กำลังประมวลผลอัลกอริทึม...", "text-indigo-600 animate-pulse");
+            await delay(400);
+
+            for (let i = 0; i < commands.length; i++) {
+                const cmd = commands[i];
+
+                // Highlight Active Command Card
+                const cmdCardEl = document.getElementById(`cmd-item-${i}`);
+                if (cmdCardEl) cmdCardEl.classList.add('executing-cmd');
+
+                if (cmd === 'FORWARD') {
+                    const vec = DIR_VECTORS[rabbitState.dir];
+                    const nextX = rabbitState.x + vec.x;
+                    const nextY = rabbitState.y + vec.y;
+
+                    // Out of bounds collision
+                    if (nextX < 0 || nextX >= level.gridSize || nextY < 0 || nextY >= level.gridSize) {
+                        playSound('wrong');
+                        updateStatusText("💥 ชนขอบแมพ! กระต่ายออกนอกเส้นทาง", "text-rose-600");
+                        if (cmdCardEl) cmdCardEl.classList.remove('executing-cmd');
+                        await handleFailure("กระต่ายเดินตกขอบแผนที่! ลองตรวจสอบการเลี้ยวและทิศทางใหม่นะ");
+                        return;
+                    }
+
+                    // Obstacle collision
+                    const isObstacle = level.obstacles.some(o => o.x === nextX && o.y === nextY);
+                    if (isObstacle) {
+                        playSound('wrong');
+                        updateStatusText("💥 ชนโขดหิน! ไม่สามารถเดินผ่านได้", "text-rose-600");
+                        if (cmdCardEl) cmdCardEl.classList.remove('executing-cmd');
+                        await handleFailure("กระต่ายชนโขดหิน! ลองอ้อมสิ่งกีดขวางใหม่อีกครั้ง");
+                        return;
+                    }
+
+                    rabbitState.x = nextX;
+                    rabbitState.y = nextY;
+                    playSound('move');
+
+                } else if (cmd === 'TURN_LEFT') {
+                    rabbitState.dir = (rabbitState.dir + 3) % 4;
+                    playSound('turn');
+                } else if (cmd === 'TURN_RIGHT') {
+                    rabbitState.dir = (rabbitState.dir + 1) % 4;
+                    playSound('turn');
+                } else if (cmd === 'COLLECT') {
+                    const carrotIdx = currentCarrots.findIndex(c => c.x === rabbitState.x && c.y === rabbitState.y && !c.collected);
+                    if (carrotIdx !== -1) {
+                        currentCarrots[carrotIdx].collected = true;
+                        playSound('collect');
+                        updateStatusText("✨ เก็บแครอทสำเร็จ! 🥕", "text-emerald-600");
+                    } else {
+                        playSound('wrong');
+                        updateStatusText("❓ ตรงนี้ไม่มีแครอทให้เก็บ!", "text-amber-600");
+                    }
+                }
+
+                renderBoard();
+                await delay(450);
+
+                if (cmdCardEl) cmdCardEl.classList.remove('executing-cmd');
+            }
+
+            // Check Win Condition
+            const allCarrotsCollected = currentCarrots.every(c => c.collected);
+            const isAtGoal = (rabbitState.x === level.goal.x && rabbitState.y === level.goal.y);
+
+            if (isAtGoal && allCarrotsCollected) {
+                playSound('win');
+                score += 200 + (lives * 50);
+                document.getElementById('scoreDisplay').innerText = score;
+                updateStatusText("🎉 ยอดเยี่ยมมาก! ทำภารกิจสำเร็จแล้ว", "text-emerald-600");
+                await delay(1000);
+
+                if (currentLevelIdx + 1 < LEVELS.length) {
+                    currentLevelIdx++;
+                    initLevel();
+                } else {
+                    showFinalSummary();
+                }
+            } else if (isAtGoal && !allCarrotsCollected) {
+                playSound('wrong');
+                await handleFailure("ถึงตะกร้าแล้ว แต่ยังเก็บแครอทไม่ครบ! ต้องเก็บแครอทให้ครบทุกหัวก่อนนะ 🥕");
+            } else {
+                playSound('wrong');
+                await handleFailure("กระต่ายยังไปไม่ถึงตะกร้าเป้าหมาย! ตรวจสอบคำสั่งเพิ่มเติมนะ");
+            }
+
+            isRunning = false;
+            document.getElementById('runBtn').disabled = false;
+        }
+
+        async function handleFailure(message) {
+            lives--;
+            updateLivesUI();
+
+            if (lives <= 0) {
+                updateStatusText("💀 หัวใจหมดแล้ว! กำลังเริ่มด่านนี้ใหม่...", "text-rose-600");
+                await delay(1500);
+                lives = 3;
+                score = Math.max(0, score - 100);
+                document.getElementById('scoreDisplay').innerText = score;
+                initLevel();
+            } else {
+                openModal("ลองใหม่อีกครั้ง! 🐞", message);
+            }
+
+            isRunning = false;
+            document.getElementById('runBtn').disabled = false;
+        }
+
+        function resetLevelState() {
+            if (isRunning) return;
+            playSound('turn');
+            const level = LEVELS[currentLevelIdx];
+            rabbitState = { ...level.start };
+            currentCarrots = level.carrots.map(c => ({ ...c }));
+            renderBoard();
+            updateStatusText("รีเซ็ตตำแหน่งกระต่ายแล้ว", "text-slate-600");
+        }
+
+        function openModal(title, msg) {
+            document.getElementById('modalTitle').innerText = title;
+            document.getElementById('modalMessage').innerText = msg;
+            document.getElementById('feedbackModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            playSound('turn');
+            document.getElementById('feedbackModal').classList.add('hidden');
+            resetLevelState();
+        }
+
+        function showFinalSummary() {
+            clearInterval(timerInterval);
+            document.getElementById('summaryScreen').classList.remove('hidden');
+
+            const mins = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+            const secs = String(timerSeconds % 60).padStart(2, '0');
+
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('finalTime').innerText = `${mins}:${secs}`;
+            
+            let heartStr = "";
+            for (let i = 0; i < lives; i++) heartStr += "❤️";
+            document.getElementById('finalLives').innerText = heartStr;
+
+            let stars = "⭐⭐⭐";
+            if (lives < 2 || timerSeconds > 300) stars = "⭐⭐";
+            if (lives === 1 && timerSeconds > 450) stars = "⭐";
+            document.getElementById('finalStars').innerText = stars;
+        }
+
+        function restartGame() {
+            playSound('turn');
+            currentLevelIdx = 0;
+            lives = 3;
+            score = 0;
+            timerSeconds = 0;
+            document.getElementById('scoreDisplay').innerText = "0";
+            document.getElementById('summaryScreen').classList.add('hidden');
+            initLevel();
+            startTimer();
+        }
+    </script>
+</body>
+</html>
